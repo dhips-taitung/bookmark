@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>k98.k98網頁管理系統</title>
+
+<style>
+  :root {
+    --primary-color: #007bff;
+    --success-color: #28a745;
+    --danger-color: #dc3545;
+    --bg-color: #f4f6f9;
+  }
+
+  body {
+    font-family: "Microsoft JhengHei", system-ui, sans-serif;
+    background: var(--bg-color);
+    margin: 0; padding: 20px; color: #333;
+  }
+
+  .header-container { display: flex; justify-content: space-between; align-items: center; max-width: 1000px; margin: 0 auto 20px auto; }
+  h1 { margin: 0; flex-grow: 1; text-align: center; font-size: 1.5rem; }
+
+  .auth-btn { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-weight: bold; transition: 0.2s; }
+  .btn-login-trigger { background: var(--primary-color); color: white; }
+  .btn-logout { background: var(--danger-color); color: white; display: none; }
+
+  .admin-panel {
+    max-width: 900px; margin: 0 auto 30px auto; background: white;
+    padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    display: none; animation: fadeIn 0.3s;
+  }
+
+  .form-group { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+  .input-item { display: flex; flex-direction: column; flex: 1; min-width: 180px; }
+  .input-item label { font-size: 14px; margin-bottom: 5px; font-weight: bold; }
+  .input-item input { padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+
+  .btn-submit { background: var(--success-color); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+  .btn-submit:disabled { background: #ccc; }
+
+  /* 登入視窗 */
+  .login-overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 1000;
+  }
+  .login-box { background: white; padding: 30px; border-radius: 12px; width: 300px; text-align: center; }
+  .login-box input { width: 100%; padding: 10px; margin: 15px 0; border: 1px solid #ddd; border-radius: 6px; }
+
+  .container { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; }
+  
+  /* 卡片與拖曳樣式 */
+  .card { 
+    background: white; padding: 15px; border-radius: 12px; 
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08); width: 310px;
+    border: 2px solid transparent; transition: 0.2s;
+  }
+  .card.drag-over { border: 2px dashed var(--primary-color); background: #f0f7ff; transform: scale(1.02); }
+  .card h2 { margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 10px; font-size: 1.1rem; color: #555; pointer-events: none; }
+
+  .section { 
+    margin: 10px 0; padding: 10px; border-bottom: 1px dashed #f0f0f0; 
+    background: #fff; border-radius: 8px; transition: background 0.2s;
+  }
+  .section.dragging { opacity: 0.4; border: 1px solid var(--primary-color); }
+  .draggable { cursor: grab; }
+  .draggable:active { cursor: grabbing; }
+
+  .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; pointer-events: none; }
+  .section-title { font-weight: bold; color: #333; font-size: 0.95rem; }
+
+  .action-btns { display: flex; gap: 5px; pointer-events: auto; }
+  .btn-action { background: none; border: none; cursor: pointer; font-size: 16px; padding: 2px 5px; display: none; }
+  .btn-edit:hover { color: #e67e22; }
+  .btn-delete:hover { color: var(--danger-color); }
+
+  .links { pointer-events: auto; }
+  .links a { display: inline-block; padding: 5px 12px; background: var(--primary-color); color: white; text-decoration: none; border-radius: 6px; font-size: 13px; }
+  
+  .status-msg { font-size: 14px; margin-bottom: 15px; color: #007bff; text-align: center; font-weight: bold; height: 20px; }
+
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+</style>
+</head>
+
+<body>
+
+<div class="header-container">
+    <button class="auth-btn btn-login-trigger" id="loginBtn" onclick="toggleLoginModal(true)">管理員登入</button>
+    <h1>k98.k98網頁管理系統</h1>
+    <button class="auth-btn btn-logout" id="logoutBtn" onclick="logout()">登出</button>
+</div>
+
+<!-- 管理面板 -->
+<div class="admin-panel" id="adminPanel">
+  <h3>➕ 加入新網址</h3>
+  <div class="form-group">
+    <div class="input-item">
+      <label>網頁分類</label>
+      <input type="text" id="catInput" placeholder="分類名稱" list="categoryList">
+      <datalist id="categoryList"></datalist>
+    </div>
+    <div class="input-item">
+      <label>網頁名稱</label>
+      <input type="text" id="nameInput" placeholder="網頁標題">
+    </div>
+    <div class="input-item">
+      <label>網址 (URL)</label>
+      <input type="text" id="urlInput" placeholder="www.google.com">
+    </div>
+    <button class="btn-submit" id="submitBtn" onclick="addLink()">送出並同步</button>
+  </div>
+</div>
+
+<div id="statusMsg" class="status-msg"></div>
+
+<div class="container" id="cardContainer"></div>
+
+<!-- 登入視窗 -->
+<div class="login-overlay" id="loginOverlay">
+    <div class="login-box">
+        <h3>管理員驗證</h3>
+        <input type="password" id="passInput" placeholder="請輸入驗證碼">
+        <button class="btn-submit" onclick="checkLogin()">登入</button>
+        <button style="border:none; background:none; cursor:pointer; color:#888; margin-top:10px;" onclick="toggleLoginModal(false)">取消</button>
+    </div>
+</div>
+
+<script>
+// ⚠️ 務必替換為您部署後的 GAS URL
+const GAS_URL = "https://script.google.com/macros/s/AKfycbyKJD_d6yAJXc00bzKl2fdRHCy1-1wGlfCRLDuJ2ELYmi9WrqCswPuS9-4fmYTppQA/exec"; 
+const LOGIN_KEY = "sds_admin_logged_in";
+const CACHE_KEY = "sds_portal_cache";
+
+let siteData = [];
+let correctAuthCode = "";
+
+// 初始化：優先顯示快取，背景同步雲端
+function init() {
+  const cache = localStorage.getItem(CACHE_KEY);
+  if (cache) {
+    siteData = JSON.parse(cache);
+    render();
+    updateCategorySuggestions();
+  }
+  loadFromSheet();
+  if (localStorage.getItem(LOGIN_KEY) === "true") showAdminUI(true);
+}
+
+// 雲端讀取資料
+async function loadFromSheet() {
+  try {
+    const response = await fetch(GAS_URL);
+    const result = await response.json();
+    correctAuthCode = result.authCode;
+    if (result.tableData) {
+      siteData = processSheetData(result.tableData);
+      localStorage.setItem(CACHE_KEY, JSON.stringify(siteData)); // 更新快取
+      render();
+      updateCategorySuggestions();
+      setStatus("✅ 雲端同步完成", 2000);
+    }
+  } catch (e) {
+    setStatus("❌ 連線雲端失敗，使用離線資料", 3000);
+  }
+}
+
+function processSheetData(rows) {
+  const categories = {};
+  for (let i = 1; i < rows.length; i++) {
+    const [cat, name, url] = rows[i];
+    if (!cat || !name || !url) continue;
+    if (!categories[cat]) categories[cat] = { category: cat, sections: [] };
+    categories[cat].sections.push({ title: name, url: formatUrl(url) });
+  }
+  return Object.values(categories);
+}
+
+function formatUrl(url) { return (url.startsWith('http') || url.startsWith('/') || url.includes('./')) ? url : 'https://' + url; }
+
+function setStatus(msg, timeout = 0) {
+    const el = document.getElementById('statusMsg');
+    el.innerText = msg;
+    if (timeout > 0) setTimeout(() => { if(el.innerText === msg) el.innerText = ""; }, timeout);
+}
+
+function updateCategorySuggestions() {
+  const datalist = document.getElementById('categoryList');
+  const categories = [...new Set(siteData.map(item => item.category))];
+  datalist.innerHTML = categories.map(cat => `<option value="${cat}">`).join('');
+}
+
+// --- 拖曳換分類功能 ---
+
+function onDragStart(e, cat, name, url) {
+    e.target.classList.add('dragging');
+    e.dataTransfer.setData("text", JSON.stringify({ oldCategory: cat, name: name, url: url }));
+}
+
+function onDragEnd(e) { e.target.classList.remove('dragging'); }
+function onDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }
+function onDragLeave(e) { e.currentTarget.classList.remove('drag-over'); }
+
+async function onDrop(e, newCategory) {
+    e.preventDefault();
+    e.currentTarget.classList.remove('drag-over');
+    const rawData = e.dataTransfer.getData("text");
+    if (!rawData) return;
+    const data = JSON.parse(rawData);
+    if (data.oldCategory === newCategory) return;
+
+    // 優化：先在本地 UI 移動位置（感覺秒傳）
+    optimisticUpdate(data.oldCategory, newCategory, data.name, data.url);
+    setStatus("⏳ 正在更新雲端試算表...");
+
+    try {
+        await fetch(GAS_URL, {
+            method: "POST",
+            body: JSON.stringify({ action: "update", oldCategory: data.oldCategory, newCategory: newCategory, name: data.name, url: data.url })
+        });
+        setStatus("✅ 移動成功", 2000);
+        // 背景重新整理一次確保同步
+        loadFromSheet();
+    } catch (err) {
+        setStatus("❌ 移動失敗，請檢查網路");
+        loadFromSheet(); // 失敗則還原
+    }
+}
+
+// 本地畫面即時更新邏輯
+function optimisticUpdate(oldCat, newCat, name, url) {
+    // 從舊分類移除
+    siteData.forEach(c => {
+        if(c.category === oldCat) c.sections = c.sections.filter(s => !(s.title === name && s.url === url));
+    });
+    // 加入新分類
+    let target = siteData.find(c => c.category === newCat);
+    if (target) {
+        target.sections.push({title: name, url: url});
+    } else {
+        siteData.push({category: newCat, sections: [{title: name, url: url}]});
+    }
+    // 移除空分類
+    siteData = siteData.filter(c => c.sections.length > 0);
+    render();
+}
+
+// --- 核心渲染 ---
+
+function render() {
+  const container = document.getElementById('cardContainer');
+  const isLoggedIn = localStorage.getItem(LOGIN_KEY) === "true";
+  
+  container.innerHTML = siteData.map(catObj => `
+    <div class="card" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event, '${catObj.category.replace(/'/g, "\\'")}')">
+      <h2>${catObj.category}</h2>
+      ${catObj.sections.map(sec => `
+        <div class="section ${isLoggedIn ? 'draggable' : ''}" 
+             draggable="${isLoggedIn}" 
+             ondragstart="onDragStart(event, '${catObj.category.replace(/'/g, "\\'")}', '${sec.title.replace(/'/g, "\\'")}', '${sec.url}')"
+             ondragend="onDragEnd(event)">
+          <div class="section-header">
+            <div class="section-title">${sec.title}</div>
+            <div class="action-btns">
+                <button class="btn-action btn-edit" style="display:${isLoggedIn?'block':'none'}" onclick="editLink('${catObj.category.replace(/'/g, "\\'")}', '${sec.title.replace(/'/g, "\\'")}', '${sec.url}')">✏️</button>
+                <button class="btn-action btn-delete" style="display:${isLoggedIn?'block':'none'}" onclick="deleteLink('${catObj.category.replace(/'/g, "\\'")}', '${sec.title.replace(/'/g, "\\'")}', '${sec.url}')">🗑️</button>
+            </div>
+          </div>
+          <div class="links"><a href="${sec.url}" target="_blank">前往系統</a></div>
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
+}
+
+// --- 管理功能 ---
+
+async function addLink() {
+  const cat = document.getElementById('catInput').value.trim();
+  const name = document.getElementById('nameInput').value.trim();
+  const url = document.getElementById('urlInput').value.trim();
+  if (!cat || !name || !url) return alert('請填寫完整資訊');
+  
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  setStatus("⏳ 正在寫入雲端並更新試算表...");
+
+  try {
+    const formattedUrl = formatUrl(url);
+    await fetch(GAS_URL, { method: "POST", body: JSON.stringify({ action: "add", category: cat, name: name, url: formattedUrl }) });
+    
+    // 即時更新本地 UI
+    let target = siteData.find(c => c.category === cat);
+    if(target) target.sections.push({title: name, url: formattedUrl});
+    else siteData.push({category: cat, sections: [{title: name, url: formattedUrl}]});
+    
+    document.getElementById('catInput').value = ''; 
+    document.getElementById('nameInput').value = ''; 
+    document.getElementById('urlInput').value = '';
+    
+    render();
+    updateCategorySuggestions();
+    setStatus("✅ 寫入成功", 2000);
+    loadFromSheet(); // 背景再次確認同步
+  } catch (e) {
+    alert("連線失敗");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function deleteLink(category, name, url, isQuiet = false) {
+  if (!isQuiet && !confirm(`確定要刪除「${name}」嗎？`)) return;
+  setStatus("⏳ 正在刪除資料...");
+  try {
+    await fetch(GAS_URL, { method: "POST", body: JSON.stringify({ action: "delete", category: category, name: name, url: url }) });
+    // 本地移除
+    siteData.forEach(c => {
+        if(c.category === category) c.sections = c.sections.filter(s => !(s.title === name && s.url === url));
+    });
+    siteData = siteData.filter(c => c.sections.length > 0);
+    render();
+    setStatus("✅ 已刪除", 2000);
+  } catch (e) { if(!isQuiet) alert("刪除失敗"); }
+}
+
+async function editLink(category, name, url) {
+    if (!confirm("修改時會先刪除，確定嗎？")) return;
+    document.getElementById('catInput').value = category;
+    document.getElementById('nameInput').value = name;
+    document.getElementById('urlInput').value = url;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    await deleteLink(category, name, url, true);
+}
+
+function toggleLoginModal(show) { document.getElementById('loginOverlay').style.display = show ? 'flex' : 'none'; }
+function checkLogin() {
+    if (document.getElementById('passInput').value === correctAuthCode) {
+        localStorage.setItem(LOGIN_KEY, "true"); showAdminUI(true); toggleLoginModal(false); render();
+    } else { alert("驗證碼錯誤！"); }
+}
+function logout() { localStorage.removeItem(LOGIN_KEY); showAdminUI(false); render(); }
+function showAdminUI(isLogin) {
+    document.getElementById('adminPanel').style.display = isLogin ? 'block' : 'none';
+    document.getElementById('logoutBtn').style.display = isLogin ? 'block' : 'none';
+    document.getElementById('loginBtn').style.display = isLogin ? 'none' : 'block';
+}
+
+init();
+</script>
+</body>
+</html>
