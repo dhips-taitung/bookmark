@@ -32,6 +32,8 @@
     display: none; animation: fadeIn 0.3s;
   }
 
+  .admin-panel h3 { margin-top: 0; color: var(--primary-color); border-left: 5px solid var(--primary-color); padding-left: 10px; margin-bottom: 15px; }
+
   .form-group { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
   .input-item { display: flex; flex-direction: column; flex: 1; min-width: 180px; }
   .input-item label { font-size: 14px; margin-bottom: 5px; font-weight: bold; }
@@ -40,7 +42,6 @@
   .btn-submit { background: var(--success-color); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; }
   .btn-submit:disabled { background: #ccc; }
 
-  /* 登入視窗 */
   .login-overlay {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
     background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 1000;
@@ -50,7 +51,6 @@
 
   .container { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; }
   
-  /* 卡片與拖曳樣式 */
   .card { 
     background: white; padding: 15px; border-radius: 12px; 
     box-shadow: 0 4px 10px rgba(0,0,0,0.08); width: 310px;
@@ -65,7 +65,6 @@
   }
   .section.dragging { opacity: 0.4; border: 1px solid var(--primary-color); }
   .draggable { cursor: grab; }
-  .draggable:active { cursor: grabbing; }
 
   .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; pointer-events: none; }
   .section-title { font-weight: bold; color: #333; font-size: 0.95rem; }
@@ -76,7 +75,8 @@
   .btn-delete:hover { color: var(--danger-color); }
 
   .links { pointer-events: auto; }
-  .links a { display: inline-block; padding: 5px 12px; background: var(--primary-color); color: white; text-decoration: none; border-radius: 6px; font-size: 13px; }
+  .links a { display: inline-block; padding: 5px 12px; background: var(--primary-color); color: white; text-decoration: none; border-radius: 6px; font-size: 13px; transition: 0.2s; }
+  .links a:hover { background: #0056b3; }
   
   .status-msg { font-size: 14px; margin-bottom: 15px; color: #007bff; text-align: center; font-weight: bold; height: 20px; }
 
@@ -92,7 +92,6 @@
     <button class="auth-btn btn-logout" id="logoutBtn" onclick="logout()">登出</button>
 </div>
 
-<!-- 管理面板 -->
 <div class="admin-panel" id="adminPanel">
   <h3>➕ 加入新網址</h3>
   <div class="form-group">
@@ -136,7 +135,7 @@ const CACHE_KEY = "sds_portal_cache";
 let siteData = [];
 let correctAuthCode = "";
 
-// 初始化：優先顯示快取，背景同步雲端
+// 啟動初始化
 function init() {
   const cache = localStorage.getItem(CACHE_KEY);
   if (cache) {
@@ -148,21 +147,21 @@ function init() {
   if (localStorage.getItem(LOGIN_KEY) === "true") showAdminUI(true);
 }
 
-// 雲端讀取資料
+// 雲端讀取資料 (J1 為驗證碼來源)
 async function loadFromSheet() {
   try {
     const response = await fetch(GAS_URL);
     const result = await response.json();
-    correctAuthCode = result.authCode;
+    correctAuthCode = result.authCode; // 這裏拿到的是從試算表 J1 抓取的值
     if (result.tableData) {
       siteData = processSheetData(result.tableData);
-      localStorage.setItem(CACHE_KEY, JSON.stringify(siteData)); // 更新快取
+      localStorage.setItem(CACHE_KEY, JSON.stringify(siteData));
       render();
       updateCategorySuggestions();
       setStatus("✅ 雲端同步完成", 2000);
     }
   } catch (e) {
-    setStatus("❌ 連線雲端失敗，使用離線資料", 3000);
+    setStatus("❌ 連線雲端失敗，目前為離線狀態", 3000);
   }
 }
 
@@ -191,7 +190,7 @@ function updateCategorySuggestions() {
   datalist.innerHTML = categories.map(cat => `<option value="${cat}">`).join('');
 }
 
-// --- 拖曳換分類功能 ---
+// --- 拖曳功能處理 ---
 
 function onDragStart(e, cat, name, url) {
     e.target.classList.add('dragging');
@@ -210,43 +209,35 @@ async function onDrop(e, newCategory) {
     const data = JSON.parse(rawData);
     if (data.oldCategory === newCategory) return;
 
-    // 優化：先在本地 UI 移動位置（感覺秒傳）
+    // 優化：樂觀更新 UI
     optimisticUpdate(data.oldCategory, newCategory, data.name, data.url);
-    setStatus("⏳ 正在更新雲端試算表...");
+    setStatus("⏳ 正在修改試算表分類...");
 
     try {
         await fetch(GAS_URL, {
             method: "POST",
             body: JSON.stringify({ action: "update", oldCategory: data.oldCategory, newCategory: newCategory, name: data.name, url: data.url })
         });
-        setStatus("✅ 移動成功", 2000);
-        // 背景重新整理一次確保同步
-        loadFromSheet();
+        setStatus("✅ 分類修改成功", 2000);
+        loadFromSheet(); // 最終與雲端再次校對
     } catch (err) {
-        setStatus("❌ 移動失敗，請檢查網路");
-        loadFromSheet(); // 失敗則還原
+        setStatus("❌ 移動失敗", 2000);
+        loadFromSheet(); 
     }
 }
 
-// 本地畫面即時更新邏輯
 function optimisticUpdate(oldCat, newCat, name, url) {
-    // 從舊分類移除
     siteData.forEach(c => {
         if(c.category === oldCat) c.sections = c.sections.filter(s => !(s.title === name && s.url === url));
     });
-    // 加入新分類
     let target = siteData.find(c => c.category === newCat);
-    if (target) {
-        target.sections.push({title: name, url: url});
-    } else {
-        siteData.push({category: newCat, sections: [{title: name, url: url}]});
-    }
-    // 移除空分類
+    if (target) target.sections.push({title: name, url: url});
+    else siteData.push({category: newCat, sections: [{title: name, url: url}]});
     siteData = siteData.filter(c => c.sections.length > 0);
     render();
 }
 
-// --- 核心渲染 ---
+// --- 介面渲染 ---
 
 function render() {
   const container = document.getElementById('cardContainer');
@@ -274,7 +265,7 @@ function render() {
   `).join('');
 }
 
-// --- 管理功能 ---
+// --- 管理邏輯 ---
 
 async function addLink() {
   const cat = document.getElementById('catInput').value.trim();
@@ -284,13 +275,13 @@ async function addLink() {
   
   const btn = document.getElementById('submitBtn');
   btn.disabled = true;
-  setStatus("⏳ 正在寫入雲端並更新試算表...");
+  setStatus("⏳ 正在寫入雲端試算表...");
 
   try {
     const formattedUrl = formatUrl(url);
     await fetch(GAS_URL, { method: "POST", body: JSON.stringify({ action: "add", category: cat, name: name, url: formattedUrl }) });
     
-    // 即時更新本地 UI
+    // 即時 UI 更新
     let target = siteData.find(c => c.category === cat);
     if(target) target.sections.push({title: name, url: formattedUrl});
     else siteData.push({category: cat, sections: [{title: name, url: formattedUrl}]});
@@ -301,8 +292,8 @@ async function addLink() {
     
     render();
     updateCategorySuggestions();
-    setStatus("✅ 寫入成功", 2000);
-    loadFromSheet(); // 背景再次確認同步
+    setStatus("✅ 加入成功", 2000);
+    loadFromSheet(); 
   } catch (e) {
     alert("連線失敗");
   } finally {
@@ -312,16 +303,15 @@ async function addLink() {
 
 async function deleteLink(category, name, url, isQuiet = false) {
   if (!isQuiet && !confirm(`確定要刪除「${name}」嗎？`)) return;
-  setStatus("⏳ 正在刪除資料...");
+  setStatus("⏳ 正在從雲端移除...");
   try {
     await fetch(GAS_URL, { method: "POST", body: JSON.stringify({ action: "delete", category: category, name: name, url: url }) });
-    // 本地移除
     siteData.forEach(c => {
         if(c.category === category) c.sections = c.sections.filter(s => !(s.title === name && s.url === url));
     });
     siteData = siteData.filter(c => c.sections.length > 0);
     render();
-    setStatus("✅ 已刪除", 2000);
+    setStatus("✅ 已移除", 2000);
   } catch (e) { if(!isQuiet) alert("刪除失敗"); }
 }
 
@@ -334,8 +324,11 @@ async function editLink(category, name, url) {
     await deleteLink(category, name, url, true);
 }
 
+// --- 驗證邏輯 ---
+
 function toggleLoginModal(show) { document.getElementById('loginOverlay').style.display = show ? 'flex' : 'none'; }
 function checkLogin() {
+    // 比對 J1 欄位抓取的驗證碼
     if (document.getElementById('passInput').value === correctAuthCode) {
         localStorage.setItem(LOGIN_KEY, "true"); showAdminUI(true); toggleLoginModal(false); render();
     } else { alert("驗證碼錯誤！"); }
