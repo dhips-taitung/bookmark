@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>個人網頁管理系統</title>
+
+<style>
+  :root {
+    --primary-color: #007bff;
+    --success-color: #28a745;
+    --danger-color: #dc3545;
+    --warning-color: #ffc107;
+    --bg-color: #f4f6f9;
+  }
+
+  body {
+    font-family: "Microsoft JhengHei", system-ui, sans-serif;
+    background: var(--bg-color);
+    margin: 0; padding: 20px; color: #333;
+  }
+
+  .header-container { display: flex; justify-content: space-between; align-items: center; max-width: 1000px; margin: 0 auto 20px auto; flex-wrap: wrap; gap: 10px; }
+  h1 { margin: 0; flex-grow: 1; text-align: center; font-size: 1.5rem; }
+
+  .auth-btn { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-weight: bold; transition: 0.2s; color: white; font-size: 14px; }
+  .btn-admin { background: #6c757d; }
+  .btn-user { background: var(--primary-color); }
+  .btn-register { background: var(--success-color); }
+  .btn-logout { background: var(--danger-color); display: none; }
+
+  .admin-panel {
+    max-width: 900px; margin: 0 auto 30px auto; background: white;
+    padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    display: none; animation: fadeIn 0.3s;
+  }
+  .admin-panel.active { display: block; }
+
+  .admin-panel h3 { margin-top: 0; color: var(--primary-color); border-left: 5px solid var(--primary-color); padding-left: 10px; margin-bottom: 15px; }
+
+  .form-group { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+  .input-item { display: flex; flex-direction: column; flex: 1; min-width: 180px; }
+  .input-item label { font-size: 14px; margin-bottom: 5px; font-weight: bold; }
+  .input-item input { padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+
+  .btn-submit { background: var(--success-color); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+  .btn-submit:disabled { background: #ccc; }
+
+  /* 模態視窗樣式 */
+  .modal-overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 1000;
+  }
+  .modal-box { background: white; padding: 30px; border-radius: 12px; width: 320px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+  .modal-box h3 { margin-top: 0; color: #333; }
+  .modal-box input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
+  .btn-cancel { background: transparent; color: #666; border: none; margin-top: 10px; cursor: pointer; text-decoration: underline; }
+
+  .container { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; }
+  
+  .card { 
+    background: white; padding: 15px; border-radius: 12px; 
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08); width: 310px;
+    border: 2px solid transparent; transition: 0.2s;
+  }
+  .card.drag-over { border: 2px dashed var(--primary-color); background: #f0f7ff; transform: scale(1.02); }
+  .card h2 { margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 10px; font-size: 1.1rem; color: #555; pointer-events: none; }
+
+  .section { 
+    margin: 10px 0; padding: 10px; border-bottom: 1px dashed #f0f0f0; 
+    background: #fff; border-radius: 8px; transition: background 0.2s;
+  }
+  .section.dragging { opacity: 0.4; border: 1px solid var(--primary-color); }
+  .draggable { cursor: grab; }
+
+  .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; pointer-events: none; }
+  .section-title { font-weight: bold; color: #333; font-size: 0.95rem; }
+
+  .action-btns { display: flex; gap: 5px; pointer-events: auto; }
+  .btn-action { background: none; border: none; cursor: pointer; font-size: 16px; padding: 2px 5px; display: none; }
+  .btn-edit:hover { color: #e67e22; }
+  .btn-delete:hover { color: var(--danger-color); }
+
+  .links { pointer-events: auto; }
+  .links a { display: inline-block; padding: 5px 12px; background: var(--primary-color); color: white; text-decoration: none; border-radius: 6px; font-size: 13px; transition: 0.2s; }
+  .links a:hover { background: #0056b3; }
+  
+  .status-msg { font-size: 14px; margin-bottom: 15px; color: #007bff; text-align: center; font-weight: bold; height: 20px; }
+  .welcome-msg { width: 100%; text-align: center; margin-bottom: 10px; color: #555; font-weight: bold; display: none;}
+
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+</style>
+</head>
+
+<body>
+
+<div class="header-container">
+    <div>
+        <button class="auth-btn btn-register" id="regBtn" onclick="toggleModal('registerModal', true)">📝 申請帳號</button>
+        <button class="auth-btn btn-user" id="userLoginBtn" onclick="toggleModal('userLoginModal', true)">👤 用戶登入</button>
+        <button class="auth-btn btn-admin" id="adminLoginBtn" onclick="toggleModal('adminLoginModal', true)">🔑 管理員登入</button>
+    </div>
+    <h1>個人網頁書籤系統</h1>
+    <button class="auth-btn btn-logout" id="logoutBtn" onclick="logout()">登出</button>
+</div>
+
+<div id="welcomeMsg" class="welcome-msg"></div>
+
+<!-- 管理/新增面板 -->
+<div class="admin-panel" id="adminPanel">
+  <h3 id="panelTitle">➕ 加入新網址</h3>
+  <div class="form-group">
+    <div class="input-item">
+      <label>網頁分類</label>
+      <input type="text" id="catInput" placeholder="分類名稱" list="categoryList">
+      <datalist id="categoryList"></datalist>
+    </div>
+    <div class="input-item">
+      <label>網頁名稱</label>
+      <input type="text" id="nameInput" placeholder="網頁標題">
+    </div>
+    <div class="input-item">
+      <label>網址 (URL)</label>
+      <input type="text" id="urlInput" placeholder="www.google.com">
+    </div>
+    <button class="btn-submit" id="submitBtn" onclick="addLink()">送出並同步</button>
+  </div>
+</div>
+
+<div id="statusMsg" class="status-msg"></div>
+<div class="container" id="cardContainer"></div>
+
+<!-- 申請帳號視窗 -->
+<div class="modal-overlay" id="registerModal">
+    <div class="modal-box">
+        <h3>申請使用</h3>
+        <input type="text" id="regName" placeholder="姓名">
+        <input type="email" id="regEmail" placeholder="E-mail">
+        <input type="text" id="regAccount" placeholder="設定帳號 (英文數字)">
+        <input type="text" id="regCode" placeholder="設定驗證碼">
+        <button class="btn-submit" onclick="registerUser()">送出申請</button>
+        <button class="btn-cancel" onclick="toggleModal('registerModal', false)">取消</button>
+    </div>
+</div>
+
+<!-- 用戶登入視窗 -->
+<div class="modal-overlay" id="userLoginModal">
+    <div class="modal-box">
+        <h3>用戶登入</h3>
+        <input type="text" id="loginAccount" placeholder="輸入帳號">
+        <input type="password" id="loginCode" placeholder="輸入驗證碼">
+        <button class="btn-submit" onclick="doLogin('user')">登入</button>
+        <button class="btn-cancel" onclick="toggleModal('userLoginModal', false)">取消</button>
+    </div>
+</div>
+
+<!-- 管理員登入視窗 -->
+<div class="modal-overlay" id="adminLoginModal">
+    <div class="modal-box">
+        <h3>管理員驗證</h3>
+        <p style="font-size:12px; color:#666;">(管理公用工作表1)</p>
+        <input type="password" id="adminPassInput" placeholder="請輸入驗證碼 (工作表1 J1)">
+        <button class="btn-submit" onclick="doLogin('admin')">登入</button>
+        <button class="btn-cancel" onclick="toggleModal('adminLoginModal', false)">取消</button>
+    </div>
+</div>
+
+<script>
+// ⚠️ 請填入您的 GAS 部署網址
+const GAS_URL = "https://script.google.com/macros/s/AKfycbwwrIfSaiXT933h8emOTN-1zPr77j3b-TIHxeZGdTw_WRKDOwU7_OPp9IOJK2NvtLn4/exec"; 
+
+// LocalStorage Keys
+const KEY_LOGIN_TYPE = "sds_login_type"; // 'admin' or 'user'
+const KEY_ACCOUNT = "sds_account";       // stored account name
+const KEY_AUTH = "sds_auth_code";        // stored verification code from sheet
+const CACHE_DATA = "sds_cache_data";
+
+let siteData = [];
+let currentAuthCode = "";
+let currentAccount = ""; // 空字串代表預設工作表
+let currentUserType = ""; // 'admin', 'user', ''
+
+// 啟動初始化
+function init() {
+  const storedType = localStorage.getItem(KEY_LOGIN_TYPE);
+  const storedAccount = localStorage.getItem(KEY_ACCOUNT);
+  
+  if (storedType) {
+    currentUserType = storedType;
+    if (storedType === 'user' && storedAccount) {
+      currentAccount = storedAccount;
+    }
+    updateUIState(true);
+  }
+
+  // 載入資料 (若有登入記錄，會嘗試載入該使用者的表)
+  loadFromSheet();
+}
+
+// 雲端讀取資料
+async function loadFromSheet() {
+  try {
+    // 透過 op=read 與 account 參數告訴 GAS 要讀哪張表
+    let url = `${GAS_URL}?op=read`;
+    
+    // 如果是使用者登入，需傳送帳號與當下輸入的驗證碼(或不傳由後端驗證，但為了抓資料，這裡傳帳號)
+    // 這裡的邏輯：讀取時傳送 account，後端判斷。若需驗證，則需傳 code。
+    // 初始化讀取時，如果是在登入狀態，我們嘗試重新驗證
+    if (currentUserType === 'user' && currentAccount) {
+       // 簡單處理：自動重整時如果不傳 code，後端可能擋住，
+       // 但此範例為了讓頁面初始化順利，若沒 code (例如重整頁面但沒存 code)，可能會失敗
+       // 這裡假設驗證成功後才顯示內容，或者需要用戶重新登入。
+       // 為了 UX，我們不在 init 傳 code，若後端擋下則登出。
+       // 但為了簡化：我們讓 API 在有 account 時驗證 code，若無 code 則報錯。
+       // 修正：我們不存密碼在 LocalStorage (安全考量)，所以重整頁面可能需要重新登入。
+       // *妥協方案*：為了示範方便，若已登入，顯示 "請重新整理資料" 或登出。
+       // 為了讓流程順暢，這裡假設使用者剛登入或 Session 存在。
+       // 這裡我們修改 loadFromSheet 邏輯：由登入動作觸發帶有 code 的請求，
+       // 平常 update 則依賴 account。
+    }
+    
+    // 這裡僅作公開讀取 (工作表1) 或 登入後的特定讀取
+    // 為了簡化，我們在 URL 加上 account 參數
+    if (currentAccount) {
+        // 注意：這裡只傳 account，若後端嚴格驗證 code，則此處會失敗。
+        // 在 doLogin 成功後我們已經拿到 data。此函數主要用於 "重新整理" 或 "新增後重讀"。
+        // 為了讓 update 操作順利，我們可能需要在 JS 變數暫存 code (不存 localStorage)
+        url += `&account=${currentAccount}`;
+        if (window.sessionCode) url += `&code=${window.sessionCode}`;
+    }
+
+    const response = await fetch(url);
+    const result = await response.json();
+    
+    if (result.error) {
+        if(currentUserType === 'user') {
+            alert("連線過期或驗證失敗，請重新登入");
+            logout();
+            return;
+        }
+        setStatus("❌ " + result.error, 3000);
+        return;
+    }
+
+    currentAuthCode = result.authCode; // 更新正確的驗證碼
+    
+    if (result.tableData) {
+      siteData = processSheetData(result.tableData);
+      render();
+      updateCategorySuggestions();
+      setStatus("✅ 資料同步完成", 2000);
+    }
+  } catch (e) {
+    setStatus("❌ 連線失敗", 3000);
+    console.error(e);
+  }
+}
+
+function processSheetData(rows) {
+  const categories = {};
+  // 判斷資料起始列：如果是 User Sheet，第一列是 Header，J1:M1 是個資，資料從 Row 2 開始
+  // 如果是 Admin Sheet (工作表1)，資料也是從 Row 2 開始 (假設 Row 1 是標題)
+  // 此程式碼假設所有工作表第一列都是標題/保留列，資料從第二列 (index 1) 開始
+  for (let i = 1; i < rows.length; i++) {
+    const [cat, name, url] = rows[i];
+    if (!cat || !name || !url) continue;
+    if (!categories[cat]) categories[cat] = { category: cat, sections: [] };
+    categories[cat].sections.push({ title: name, url: formatUrl(url) });
+  }
+  return Object.values(categories);
+}
+
+function formatUrl(url) { return (url.startsWith('http') || url.startsWith('/') || url.includes('./')) ? url : 'https://' + url; }
+
+function setStatus(msg, timeout = 0) {
+    const el = document.getElementById('statusMsg');
+    el.innerText = msg;
+    if (timeout > 0) setTimeout(() => { if(el.innerText === msg) el.innerText = ""; }, timeout);
+}
+
+// --- 註冊功能 ---
+async function registerUser() {
+    const name = document.getElementById('regName').value.trim();
+    const email = document.getElementById('regEmail').value.trim();
+    const account = document.getElementById('regAccount').value.trim();
+    const code = document.getElementById('regCode').value.trim();
+
+    if (!name || !email || !account || !code) return alert("請填寫所有欄位");
+
+    setStatus("⏳ 提交申請中...");
+    try {
+        const res = await fetch(GAS_URL, {
+            method: "POST",
+            body: JSON.stringify({ action: "register", name, email, account, code })
+        });
+        const result = await res.json();
+        if (result.result === "success") {
+            alert("申請已送出！\n請等待管理員核可，核可後您將收到 Email 通知。");
+            toggleModal('registerModal', false);
+        } else {
+            alert("申請失敗：" + result.error);
+        }
+    } catch(e) {
+        alert("連線錯誤");
+    }
+    setStatus("");
+}
+
+// --- 登入/登出邏輯 ---
+
+function toggleModal(id, show) {
+    document.getElementById(id).style.display = show ? 'flex' : 'none';
+}
+
+async function doLogin(type) {
+    let inputCode = "";
+    let account = "";
+
+    if (type === 'admin') {
+        inputCode = document.getElementById('adminPassInput').value;
+        account = ""; // Admin 使用預設工作表
+    } else {
+        account = document.getElementById('loginAccount').value.trim();
+        inputCode = document.getElementById('loginCode').value.trim();
+        if (!account) return alert("請輸入帳號");
+    }
+
+    setStatus("⏳ 驗證中...");
+    
+    // 呼叫後端驗證並取得資料
+    const url = `${GAS_URL}?op=read&account=${account}&code=${inputCode}`;
+    try {
+        const res = await fetch(url);
+        const result = await res.json();
+        
+        if (result.error) {
+            alert("登入失敗：" + result.error);
+            setStatus("");
+            return;
+        }
+
+        // 登入成功
+        window.sessionCode = inputCode; // 暫存 session
+        currentAuthCode = result.authCode;
+        currentUserType = type;
+        currentAccount = account;
+        siteData = processSheetData(result.tableData);
+        
+        localStorage.setItem(KEY_LOGIN_TYPE, type);
+        if (account) localStorage.setItem(KEY_ACCOUNT, account);
+
+        toggleModal(type === 'admin' ? 'adminLoginModal' : 'userLoginModal', false);
+        updateUIState(true);
+        render();
+        updateCategorySuggestions();
+        setStatus("✅ 登入成功", 2000);
+
+    } catch (e) {
+        alert("連線錯誤");
+        setStatus("");
+    }
+}
+
+function logout() {
+    localStorage.removeItem(KEY_LOGIN_TYPE);
+    localStorage.removeItem(KEY_ACCOUNT);
+    currentUserType = "";
+    currentAccount = "";
+    currentAuthCode = "";
+    window.sessionCode = null;
+    
+    // 回復預設狀態 (讀取公開表)
+    siteData = [];
+    updateUIState(false);
+    loadFromSheet(); // 重新讀取預設表
+}
+
+function updateUIState(isLoggedIn) {
+    // 按鈕顯示控制
+    document.getElementById('regBtn').style.display = isLoggedIn ? 'none' : 'inline-block';
+    document.getElementById('userLoginBtn').style.display = isLoggedIn ? 'none' : 'inline-block';
+    document.getElementById('adminLoginBtn').style.display = isLoggedIn ? 'none' : 'inline-block';
+    document.getElementById('logoutBtn').style.display = isLoggedIn ? 'inline-block' : 'none';
+    
+    // 面板顯示
+    const panel = document.getElementById('adminPanel');
+    if (isLoggedIn) {
+        panel.classList.add('active');
+        document.getElementById('panelTitle').innerText = currentUserType === 'admin' ? "➕ 管理員新增 (公開表)" : `➕ 新增書籤 (${currentAccount})`;
+        
+        const welcome = document.getElementById('welcomeMsg');
+        welcome.style.display = 'block';
+        welcome.innerText = currentUserType === 'admin' ? "目前身份：管理員" : `歡迎回來，${currentAccount}`;
+    } else {
+        panel.classList.remove('active');
+        document.getElementById('welcomeMsg').style.display = 'none';
+    }
+}
+
+// --- CRUD 操作 (新增/修改/刪除) ---
+// 這些函數需要將 currentAccount 帶入，確保操作正確的工作表
+
+async function addLink() {
+  const cat = document.getElementById('catInput').value.trim();
+  const name = document.getElementById('nameInput').value.trim();
+  const url = document.getElementById('urlInput').value.trim();
+  if (!cat || !name || !url) return alert('請填寫完整資訊');
+  
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  setStatus("⏳ 寫入中...");
+
+  try {
+    const formattedUrl = formatUrl(url);
+    await fetch(GAS_URL, { 
+        method: "POST", 
+        body: JSON.stringify({ 
+            action: "add", 
+            account: currentAccount, // 關鍵：指定工作表
+            category: cat, name: name, url: formattedUrl 
+        }) 
+    });
+    
+    // 樂觀更新 UI
+    let target = siteData.find(c => c.category === cat);
+    if(target) target.sections.push({title: name, url: formattedUrl});
+    else siteData.push({category: cat, sections: [{title: name, url: formattedUrl}]});
+    
+    document.getElementById('catInput').value = ''; 
+    document.getElementById('nameInput').value = ''; 
+    document.getElementById('urlInput').value = '';
+    
+    render();
+    updateCategorySuggestions();
+    setStatus("✅ 加入成功", 2000);
+  } catch (e) {
+    alert("連線失敗");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function deleteLink(category, name, url, isQuiet = false) {
+  if (!isQuiet && !confirm(`確定要刪除「${name}」嗎？`)) return;
+  setStatus("⏳ 移除中...");
+  try {
+    await fetch(GAS_URL, { 
+        method: "POST", 
+        body: JSON.stringify({ 
+            action: "delete", 
+            account: currentAccount, 
+            category: category, name: name, url: url 
+        }) 
+    });
+    
+    siteData.forEach(c => {
+        if(c.category === category) c.sections = c.sections.filter(s => !(s.title === name && s.url === url));
+    });
+    siteData = siteData.filter(c => c.sections.length > 0);
+    render();
+    setStatus("✅ 已移除", 2000);
+  } catch (e) { if(!isQuiet) alert("刪除失敗"); }
+}
+
+async function editLink(category, name, url) {
+    if (!confirm("修改時會先刪除舊資料，確定嗎？")) return;
+    document.getElementById('catInput').value = category;
+    document.getElementById('nameInput').value = name;
+    document.getElementById('urlInput').value = url;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    await deleteLink(category, name, url, true);
+}
+
+// --- 拖曳與渲染 (保持大部分原樣，僅需注意 loggedIn 狀態) ---
+
+function render() {
+  const container = document.getElementById('cardContainer');
+  const isLoggedIn = !!currentUserType; // 只要有登入 (admin or user) 都可以編輯自己的表
+  
+  container.innerHTML = siteData.map(catObj => `
+    <div class="card" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event, '${catObj.category.replace(/'/g, "\\'")}')">
+      <h2>${catObj.category}</h2>
+      ${catObj.sections.map(sec => `
+        <div class="section ${isLoggedIn ? 'draggable' : ''}" 
+             draggable="${isLoggedIn}" 
+             ondragstart="onDragStart(event, '${catObj.category.replace(/'/g, "\\'")}', '${sec.title.replace(/'/g, "\\'")}', '${sec.url}')"
+             ondragend="onDragEnd(event)">
+          <div class="section-header">
+            <div class="section-title">${sec.title}</div>
+            <div class="action-btns">
+                <button class="btn-action btn-edit" style="display:${isLoggedIn?'block':'none'}" onclick="editLink('${catObj.category.replace(/'/g, "\\'")}', '${sec.title.replace(/'/g, "\\'")}', '${sec.url}')">✏️</button>
+                <button class="btn-action btn-delete" style="display:${isLoggedIn?'block':'none'}" onclick="deleteLink('${catObj.category.replace(/'/g, "\\'")}', '${sec.title.replace(/'/g, "\\'")}', '${sec.url}')">🗑️</button>
+            </div>
+          </div>
+          <div class="links"><a href="${sec.url}" target="_blank">前往系統</a></div>
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
+}
+
+function updateCategorySuggestions() {
+  const datalist = document.getElementById('categoryList');
+  const categories = [...new Set(siteData.map(item => item.category))];
+  datalist.innerHTML = categories.map(cat => `<option value="${cat}">`).join('');
+}
+
+// 拖曳相關事件
+function onDragStart(e, cat, name, url) {
+    e.target.classList.add('dragging');
+    e.dataTransfer.setData("text", JSON.stringify({ oldCategory: cat, name: name, url: url }));
+}
+function onDragEnd(e) { e.target.classList.remove('dragging'); }
+function onDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }
+function onDragLeave(e) { e.currentTarget.classList.remove('drag-over'); }
+async function onDrop(e, newCategory) {
+    e.preventDefault();
+    e.currentTarget.classList.remove('drag-over');
+    if (!currentUserType) return; // 未登入不可拖曳
+
+    const rawData = e.dataTransfer.getData("text");
+    if (!rawData) return;
+    const data = JSON.parse(rawData);
+    if (data.oldCategory === newCategory) return;
+
+    // 樂觀更新
+    siteData.forEach(c => {
+        if(c.category === data.oldCategory) c.sections = c.sections.filter(s => !(s.title === data.name && s.url === data.url));
+    });
+    let target = siteData.find(c => c.category === newCategory);
+    if (target) target.sections.push({title: data.name, url: data.url});
+    else siteData.push({category: newCategory, sections: [{title: data.name, url: data.url}]});
+    siteData = siteData.filter(c => c.sections.length > 0);
+    render();
+
+    setStatus("⏳ 更新分類中...");
+    try {
+        await fetch(GAS_URL, {
+            method: "POST",
+            body: JSON.stringify({ 
+                action: "update", 
+                account: currentAccount,
+                oldCategory: data.oldCategory, newCategory: newCategory, name: data.name, url: data.url 
+            })
+        });
+        setStatus("✅ 分類修改成功", 2000);
+    } catch (err) {
+        setStatus("❌ 移動失敗", 2000);
+        loadFromSheet(); 
+    }
+}
+
+init();
+</script>
+</body>
+</html>
