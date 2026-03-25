@@ -99,8 +99,6 @@
     width: 100%;
   }
 
-
-  
   @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 </style>
 </head>
@@ -143,6 +141,7 @@
 <div id="statusMsg" class="status-msg"></div>
 <div class="container" id="cardContainer"></div>
 
+<!-- 增加的版權聲明 -->
 <footer class="site-footer">
   © 2026 chienmu.tai 保留所有權利
 </footer>
@@ -192,7 +191,7 @@ const KEY_ACCOUNT = "sds_account";       // stored account name
 const KEY_AUTH = "sds_auth_code";        // stored verification code from sheet
 const CACHE_DATA = "sds_cache_data";
 
-let siteData = [];
+let siteData =[];
 let currentAuthCode = "";
 let currentAccount = ""; // 空字串代表預設工作表
 let currentUserType = ""; // 'admin', 'user', ''
@@ -279,7 +278,7 @@ function processSheetData(rows) {
   // 如果是 Admin Sheet (工作表1)，資料也是從 Row 2 開始 (假設 Row 1 是標題)
   // 此程式碼假設所有工作表第一列都是標題/保留列，資料從第二列 (index 1) 開始
   for (let i = 1; i < rows.length; i++) {
-    const [cat, name, url] = rows[i];
+    const[cat, name, url] = rows[i];
     if (!cat || !name || !url) continue;
     if (!categories[cat]) categories[cat] = { category: cat, sections: [] };
     categories[cat].sections.push({ title: name, url: formatUrl(url) });
@@ -387,7 +386,7 @@ function logout() {
     window.sessionCode = null;
     
     // 回復預設狀態 (讀取公開表)
-    siteData = [];
+    siteData =[];
     updateUIState(false);
     loadFromSheet(); // 重新讀取預設表
 }
