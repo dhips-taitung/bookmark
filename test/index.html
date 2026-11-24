@@ -42,7 +42,6 @@
   .input-item { display: flex; flex-direction: column; flex: 1; min-width: 180px; }
   .input-item label { font-size: 14px; margin-bottom: 5px; font-weight: bold; }
   .input-item input { padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
-  .input-item input:read-only { background-color: #e9ecef; cursor: not-allowed; }
 
   .btn-submit { background: var(--success-color); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; }
   .btn-submit:disabled { background: #ccc; }
@@ -52,7 +51,7 @@
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
     background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 1000;
   }
-  .modal-box { background: white; padding: 30px; border-radius: 12px; width: 340px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+  .modal-box { background: white; padding: 30px; border-radius: 12px; width: 350px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
   .modal-box h3 { margin-top: 0; color: #333; }
   .modal-box input { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
   .modal-box input:read-only { background-color: #f1f1f1; cursor: not-allowed; }
@@ -103,12 +102,11 @@
 
 <div class="header-container">
     <div class="auth-box">
-        <!-- Google 登入按鈕容器 -->
         <div id="googleBtnContainer"></div>
         <button class="auth-btn btn-logout" id="logoutBtn" onclick="logout()">登出</button>
     </div>
     <h1>個人網頁書籤系統</h1>
-    <div style="width: 80px;"></div> <!-- 排版平衡佔位 -->
+    <div style="width: 80px;"></div>
 </div>
 
 <div id="welcomeMsg" class="welcome-msg" style="display: none;"></div>
@@ -141,22 +139,44 @@
   © 2026 chienmu.tai 保留所有權利
 </footer>
 
-<!-- 第一次申請帳號視窗 -->
+<!-- 視窗 1：建立專屬工作表 (已通過共用審核的使用者) -->
+<div class="modal-overlay" id="createSheetModal">
+    <div class="modal-box">
+        <h3>✨ 建立專屬工作表</h3>
+        <p style="font-size:12px; color:#28a745; margin-top:-5px; margin-bottom:15px; font-weight:bold;">
+          您的帳號已具備使用權限！<br>請設定個人專屬書籤分頁（限建一個）：
+        </p>
+        <div style="text-align: left;">
+            <label style="font-size:12px; font-weight:bold; color:#666;">使用者姓名</label>
+            <input type="text" id="csName" readonly>
+            
+            <label style="font-size:12px; font-weight:bold; color:#666;">E-mail</label>
+            <input type="email" id="csEmail" readonly>
+            
+            <label style="font-size:12px; font-weight:bold; color:#d9534f;">設定專屬工作表名稱 (建議英數組合)</label>
+            <input type="text" id="csAccount" placeholder="例如：tracy3119">
+        </div>
+        <button class="btn-submit" style="width: 100%; margin-top: 10px;" onclick="submitCreateSheet()">生成專屬工作表並登入</button>
+        <button class="btn-cancel" onclick="toggleModal('createSheetModal', false)">取消</button>
+    </div>
+</div>
+
+<!-- 視窗 2：全新申請帳號視窗 (未在審核清單中) -->
 <div class="modal-overlay" id="registerModal">
     <div class="modal-box">
         <h3>申請使用</h3>
-        <p style="font-size:12px; color:#666; margin-top:-5px; margin-bottom:15px;">Google 授權成功，請完成基本資料</p>
+        <p style="font-size:12px; color:#666; margin-top:-5px; margin-bottom:15px;">Google 授權成功，請完成基本申請：</p>
         <div style="text-align: left;">
             <label style="font-size:12px; font-weight:bold; color:#666;">姓名</label>
-            <input type="text" id="regName" placeholder="姓名">
+            <input type="text" id="regName">
             
             <label style="font-size:12px; font-weight:bold; color:#666;">E-mail (自動帶入)</label>
-            <input type="email" id="regEmail" placeholder="E-mail" readonly>
+            <input type="email" id="regEmail" readonly>
             
             <label style="font-size:12px; font-weight:bold; color:#666;">設定帳號 (工作表名稱)</label>
-            <input type="text" id="regAccount" placeholder="例如：tracy3119 (僅限英數字)">
+            <input type="text" id="regAccount" placeholder="例如：tracy3119">
         </div>
-        <button class="btn-submit" style="width: 100%; margin-top: 10px;" onclick="submitRegistration()">送出申請</button>
+        <button class="btn-submit" style="width: 100%; margin-top: 10px;" onclick="submitRegistration()">送出審核申請</button>
         <button class="btn-cancel" onclick="toggleModal('registerModal', false)">取消</button>
     </div>
 </div>
@@ -170,17 +190,15 @@ const GOOGLE_CLIENT_ID = "341910377782-3unva3oggi84vp88uga23horpumjaptt.apps.goo
 
 let siteData = [];
 let currentAccount = ""; 
-let currentUserType = ""; // 'admin', 'user', ''
+let currentUserType = ""; 
 let currentUserName = "";
-let tempGoogleUser = null; // 暫存未註冊的 Google 帳號資料
+let tempGoogleUser = null; 
 
-// 頁面初始化
 window.onload = function() {
   initGoogleAuth();
   loadPublicBookmarks();
 };
 
-// 初始化 Google Identity Services
 function initGoogleAuth() {
   if (typeof google === 'undefined') {
     setTimeout(initGoogleAuth, 300);
@@ -200,7 +218,6 @@ function renderGoogleButton() {
   );
 }
 
-// 解析 JWT Token
 function decodeJwtResponse(token) {
   var base64Url = token.split('.')[1];
   var base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
@@ -210,7 +227,7 @@ function decodeJwtResponse(token) {
   return JSON.parse(jsonPayload);
 }
 
-// Google 登入回呼函式
+// 處理 Google 登入回傳
 async function handleCredentialResponse(response) {
   setStatus("⏳ 登入驗證中...");
   const payload = decodeJwtResponse(response.credential);
@@ -220,6 +237,7 @@ async function handleCredentialResponse(response) {
     email: payload.email,
     name: payload.name
   };
+  tempGoogleUser = googleUser;
 
   try {
     const res = await fetch(GAS_URL, {
@@ -239,10 +257,17 @@ async function handleCredentialResponse(response) {
       updateCategorySuggestions();
       setStatus("✅ 登入成功", 2000);
 
+    // 【新增狀態】已核准，但尚未在書籤表建立專屬工作表
+    } else if (data.result === "need_create_sheet") {
+      setStatus("");
+      document.getElementById('csName').value = data.name || googleUser.name;
+      document.getElementById('csEmail').value = data.email || googleUser.email;
+      document.getElementById('csAccount').value = "";
+      toggleModal('createSheetModal', true);
+
+    // 完全未申請過
     } else if (data.result === "need_register") {
       setStatus("");
-      // 第一次使用，開啟填寫資料視窗
-      tempGoogleUser = googleUser;
       document.getElementById('regName').value = googleUser.name;
       document.getElementById('regEmail').value = googleUser.email;
       document.getElementById('regAccount').value = "";
@@ -257,25 +282,68 @@ async function handleCredentialResponse(response) {
     }
   } catch (err) {
     console.error(err);
-    alert("連線後端錯誤，請確認網路或 GAS 網址");
+    alert("連線後端錯誤，請檢查網路或 GAS 部署");
     setStatus("");
   }
 }
 
-// 第一次申請提交
+// 提交「生成專屬工作表」
+async function submitCreateSheet() {
+  const name = document.getElementById('csName').value.trim();
+  const email = document.getElementById('csEmail').value.trim();
+  const account = document.getElementById('csAccount').value.trim();
+
+  if (!account) return alert("請輸入想要設定的工作表名稱！");
+  if (!/^[a-zA-Z0-9_]+$/.test(account)) {
+    return alert("工作表名稱僅允許英文字母、數字與底線！");
+  }
+
+  setStatus("⏳ 正在為您建立專屬工作表...");
+  try {
+    const res = await fetch(GAS_URL, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "createSheet",
+        uuid: tempGoogleUser ? tempGoogleUser.uuid : "",
+        email: email,
+        name: name,
+        account: account
+      })
+    });
+    const data = await res.json();
+
+    if (data.result === "success") {
+      alert(`🎉 恭喜！工作表「${account}」建立完成！\n系統已自動為您登入。`);
+      toggleModal('createSheetModal', false);
+
+      // 直接登入
+      currentUserType = data.role;
+      currentAccount = data.account;
+      currentUserName = data.userName;
+      siteData = processSheetData(data.tableData);
+
+      updateUIState(true);
+      render();
+      updateCategorySuggestions();
+      setStatus("✅ 已成功載入個人書籤", 2000);
+    } else {
+      alert("建立失敗：" + data.error);
+      setStatus("");
+    }
+  } catch (e) {
+    alert("連線失敗，請稍後再試");
+    setStatus("");
+  }
+}
+
+// 提交全新註冊申請
 async function submitRegistration() {
   const name = document.getElementById('regName').value.trim();
   const email = document.getElementById('regEmail').value.trim();
   const account = document.getElementById('regAccount').value.trim();
 
-  if (!name || !email || !account) {
-    return alert("請填寫所有欄位！");
-  }
-
-  // 僅限英數字與底線，防止分頁名稱錯誤
-  if (!/^[a-zA-Z0-9_]+$/.test(account)) {
-    return alert("帳號（工作表名稱）僅允許英數字與底線！");
-  }
+  if (!name || !email || !account) return alert("請填寫所有欄位！");
+  if (!/^[a-zA-Z0-9_]+$/.test(account)) return alert("帳號僅允許英數字與底線！");
 
   setStatus("⏳ 提交申請中...");
   try {
@@ -291,7 +359,7 @@ async function submitRegistration() {
     });
     const result = await res.json();
     if (result.result === "success") {
-      alert("🎉 申請已送出！\n\n系統已建立您的專屬書籤分頁，並已發送審核通知給管理員。\n待管理員核可後，您便可直接使用 Google 登入！");
+      alert("🎉 申請已送出！\n\n系統已發送審核通知給管理員，待管理員核可後，便可直接登入！");
       toggleModal('registerModal', false);
     } else {
       alert("申請失敗：" + result.error);
@@ -302,7 +370,7 @@ async function submitRegistration() {
   setStatus("");
 }
 
-// 載入公開預設書籤 (未登入時)
+// 讀取公開書籤
 async function loadPublicBookmarks() {
   try {
     const res = await fetch(`${GAS_URL}?op=read`);
