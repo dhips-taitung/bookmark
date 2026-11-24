@@ -142,9 +142,9 @@
 <!-- 視窗 1：建立專屬工作表 (已通過共用審核的使用者) -->
 <div class="modal-overlay" id="createSheetModal">
     <div class="modal-box">
-        <h3>✨ 建立專屬工作表</h3>
+        <h3>✨ 建立 / 連結專屬工作表</h3>
         <p style="font-size:12px; color:#28a745; margin-top:-5px; margin-bottom:15px; font-weight:bold;">
-          您的帳號已具備使用權限！<br>請設定個人專屬書籤分頁（限建一個）：
+          您的帳號已具備核准資格！<br>請輸入工作表名稱（若已有舊表可輸入原有名稱直接連結）：
         </p>
         <div style="text-align: left;">
             <label style="font-size:12px; font-weight:bold; color:#666;">使用者姓名</label>
@@ -153,19 +153,19 @@
             <label style="font-size:12px; font-weight:bold; color:#666;">E-mail</label>
             <input type="email" id="csEmail" readonly>
             
-            <label style="font-size:12px; font-weight:bold; color:#d9534f;">設定專屬工作表名稱 (建議英數組合)</label>
+            <label style="font-size:12px; font-weight:bold; color:#d9534f;">工作表名稱 (建議英數組合)</label>
             <input type="text" id="csAccount" placeholder="例如：tracy3119">
         </div>
-        <button class="btn-submit" style="width: 100%; margin-top: 10px;" onclick="submitCreateSheet()">生成專屬工作表並登入</button>
+        <button class="btn-submit" style="width: 100%; margin-top: 10px;" onclick="submitCreateSheet()">確認並進入系統</button>
         <button class="btn-cancel" onclick="toggleModal('createSheetModal', false)">取消</button>
     </div>
 </div>
 
-<!-- 視窗 2：全新申請帳號視窗 (未在審核清單中) -->
+<!-- 視窗 2：申請帳號視窗 (未在審核清單中) -->
 <div class="modal-overlay" id="registerModal">
     <div class="modal-box">
         <h3>申請使用</h3>
-        <p style="font-size:12px; color:#666; margin-top:-5px; margin-bottom:15px;">Google 授權成功，請完成基本申請：</p>
+        <p style="font-size:12px; color:#666; margin-top:-5px; margin-bottom:15px;">Google 授權成功，請完成基本申請：<br><span style="color:#007bff;">(若之前已有工作表，輸入原有名稱即可重新綁定)</span></p>
         <div style="text-align: left;">
             <label style="font-size:12px; font-weight:bold; color:#666;">姓名</label>
             <input type="text" id="regName">
@@ -173,10 +173,10 @@
             <label style="font-size:12px; font-weight:bold; color:#666;">E-mail (自動帶入)</label>
             <input type="email" id="regEmail" readonly>
             
-            <label style="font-size:12px; font-weight:bold; color:#666;">設定帳號 (工作表名稱)</label>
+            <label style="font-size:12px; font-weight:bold; color:#666;">工作表名稱 (英數字組合)</label>
             <input type="text" id="regAccount" placeholder="例如：tracy3119">
         </div>
-        <button class="btn-submit" style="width: 100%; margin-top: 10px;" onclick="submitRegistration()">送出審核申請</button>
+        <button class="btn-submit" style="width: 100%; margin-top: 10px;" onclick="submitRegistration()">送出申請</button>
         <button class="btn-cancel" onclick="toggleModal('registerModal', false)">取消</button>
     </div>
 </div>
@@ -227,7 +227,6 @@ function decodeJwtResponse(token) {
   return JSON.parse(jsonPayload);
 }
 
-// 處理 Google 登入回傳
 async function handleCredentialResponse(response) {
   setStatus("⏳ 登入驗證中...");
   const payload = decodeJwtResponse(response.credential);
@@ -257,7 +256,7 @@ async function handleCredentialResponse(response) {
       updateCategorySuggestions();
       setStatus("✅ 登入成功", 2000);
 
-    // 【新增狀態】已核准，但尚未在書籤表建立專屬工作表
+    // 已核准但尚未連結工作表
     } else if (data.result === "need_create_sheet") {
       setStatus("");
       document.getElementById('csName').value = data.name || googleUser.name;
@@ -287,18 +286,18 @@ async function handleCredentialResponse(response) {
   }
 }
 
-// 提交「生成專屬工作表」
+// 提交建立或綁定工作表 (已具備 Approved 資格)
 async function submitCreateSheet() {
   const name = document.getElementById('csName').value.trim();
   const email = document.getElementById('csEmail').value.trim();
   const account = document.getElementById('csAccount').value.trim();
 
-  if (!account) return alert("請輸入想要設定的工作表名稱！");
+  if (!account) return alert("請輸入工作表名稱！");
   if (!/^[a-zA-Z0-9_]+$/.test(account)) {
     return alert("工作表名稱僅允許英文字母、數字與底線！");
   }
 
-  setStatus("⏳ 正在為您建立專屬工作表...");
+  setStatus("⏳ 正在驗證並設定工作表...");
   try {
     const res = await fetch(GAS_URL, {
       method: "POST",
@@ -313,10 +312,9 @@ async function submitCreateSheet() {
     const data = await res.json();
 
     if (data.result === "success") {
-      alert(`🎉 恭喜！工作表「${account}」建立完成！\n系統已自動為您登入。`);
+      alert(`🎉 工作表「${account}」連結完成！\n系統已自動為您登入。`);
       toggleModal('createSheetModal', false);
 
-      // 直接登入
       currentUserType = data.role;
       currentAccount = data.account;
       currentUserName = data.userName;
@@ -325,9 +323,9 @@ async function submitCreateSheet() {
       updateUIState(true);
       render();
       updateCategorySuggestions();
-      setStatus("✅ 已成功載入個人書籤", 2000);
+      setStatus("✅ 已成功載入書籤", 2000);
     } else {
-      alert("建立失敗：" + data.error);
+      alert("操作失敗：" + data.error);
       setStatus("");
     }
   } catch (e) {
@@ -336,14 +334,14 @@ async function submitCreateSheet() {
   }
 }
 
-// 提交全新註冊申請
+// 提交註冊或舊工作表綁定申請
 async function submitRegistration() {
   const name = document.getElementById('regName').value.trim();
   const email = document.getElementById('regEmail').value.trim();
   const account = document.getElementById('regAccount').value.trim();
 
   if (!name || !email || !account) return alert("請填寫所有欄位！");
-  if (!/^[a-zA-Z0-9_]+$/.test(account)) return alert("帳號僅允許英數字與底線！");
+  if (!/^[a-zA-Z0-9_]+$/.test(account)) return alert("工作表名稱僅允許英數字與底線！");
 
   setStatus("⏳ 提交申請中...");
   try {
@@ -358,9 +356,30 @@ async function submitRegistration() {
       })
     });
     const result = await res.json();
+
     if (result.result === "success") {
-      alert("🎉 申請已送出！\n\n系統已發送審核通知給管理員，待管理員核可後，便可直接登入！");
+      alert(result.message || "🎉 申請已送出！\n\n系統已發送審核通知給管理員，待管理員核可後即可直接登入！");
       toggleModal('registerModal', false);
+
+    // 若該使用者在審核表已是 Approved，後端直接回傳 approved_ready 完成登入
+    } else if (result.result === "approved_ready") {
+      alert(`🎉 驗證成功！您已具備核准權限，已重新連結您原有的工作表「${result.account}」！`);
+      toggleModal('registerModal', false);
+
+      currentUserType = "user";
+      currentAccount = result.account;
+      currentUserName = result.userName;
+      siteData = processSheetData(result.tableData);
+
+      updateUIState(true);
+      render();
+      updateCategorySuggestions();
+      setStatus("✅ 已成功載入個人書籤", 2000);
+
+    } else if (result.result === "pending") {
+      alert("⚠️ " + (result.message || "帳號審核中，請待管理員核可。"));
+      toggleModal('registerModal', false);
+
     } else {
       alert("申請失敗：" + result.error);
     }
